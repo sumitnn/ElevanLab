@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Environments
+.env
+venv
+output.json
+
+
+
+
+
+
+
+# mypy
+.mypy_cache/
+
+# Pylint
+.pylint.d/
+
+# pytest
+.pytest_cache/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
