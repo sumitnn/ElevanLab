@@ -24,19 +24,18 @@ HEADERS = {
 
 async def create_patient_and_store(patient_data: dict, db) -> dict:
 
+
     url = f"{DENTALLY_BASE_URL}/patients"
     try:
         data=json.dumps(patient_data)
         response = requests.post(url, data=data, headers=HEADERS)
         response.raise_for_status()
+        print(response.content)
         api_response = response.json()
         patient = api_response.get("patient")
         if not patient:
             print("❌ API response does not contain 'patient' key.")
             return False
-        
-
-
         
         # Save to MongoDB with external ID from API
         await db["patients"].insert_one(patient)
@@ -50,11 +49,13 @@ async def create_patient_and_store(patient_data: dict, db) -> dict:
 
 async def create_appointment_and_store(appointment_data: dict, db) -> dict:
 
+
     url = f"{DENTALLY_BASE_URL}/appointments"
     data=json.dumps(appointment_data)
     try:
         response = requests.post(url, data=data, headers=HEADERS)
         response.raise_for_status()
+        print(response.content)
         api_response = response.json()
 
         appointment = api_response.get("appointment")

@@ -16,7 +16,7 @@ from dateutil import parser as date_parser
 import requests
 from typing import List
 from router.dentally import get_availability_from_dentally
-
+from utils.sms import create_stripe_payment_link, send_sms
 load_dotenv()
 elevanlab_router = APIRouter()
 
@@ -82,66 +82,113 @@ async def check_available_time(practitioner_id: int, start_time: str, finish_tim
             "message": f"Something Went Wrong in Backend",
         }
 
-@elevanlab_router.post("/create-appointment",status_code=status.HTTP_200_OK)
-async def webhook_listener(request: Request, elevenlabs_signature: str = Header(None)):
 
+
+async def get_usdt_amount(pateint_type:str, consulation: str) -> int:
+    if pateint_type == "New":
+        if consulation == "Biological Consultation":
+            return 75
+        elif consulation == "General Consultation":
+            return 50
+        elif consulation == "Hygiene Appointment":
+            return 50
+        else:
+            return 75
+    elif pateint_type == "Existing":
+        if consulation == "Biological Consultation":
+            return 50
+        elif consulation == "General Consultation":
+            return 50
+        elif consulation == "Hygiene Appointment":
+            return 50
+        else:
+            return 50
+    else:
+        return 50
+    
+
+@elevanlab_router.post("/create-appointment", status_code=status.HTTP_200_OK)
+async def webhook_listener(request: Request, elevenlabs_signature: str = Header(None)):
     body = await request.body()
+ 
 
     if not verify_elevanlab_webhook_signature(body, elevenlabs_signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
-    event = json.loads(body)
-    db = await get_db()
     try:
-        if event.get("type") == "post_call_transcription":
-            data = event["data"]
-            if data["agent_id"] == ELEVENLABS_AGENT_ID:
-                transcipt_data=data["transcript"]
-                response=await OpenAiModel(transcipt_data)
-                print("Response from OpenAI:", response)
-                if response:
-                    pateint_data = {
-                        "patient": {
-                            "title": response.get('patient_title',"Mr"),
-                            "first_name": response.get('patient_first_name'),
-                            "last_name": response.get('patient_last_name'," "),
-                            "date_of_birth": response.get('pateint_dob'),
-                            "gender": response.get('pateint_gender',True), 
-                            "ethnicity": response.get('patient_ethnicity'),
-                            "address_line_1": response.get('patient_address_line_1'," "),
-                            "postcode": response.get('pateint_postcode'," "),
-                            "payment_plan_id": int(response.get('patient_payment_plan_id')),
-                            "payment_plan": [int(response.get('patient_payment_plan_id'))],
-                            "email_address": response.get('patient_email'),
-                        }
-                    }
-                    appintment_data={
-                        "appointment": {
-                            "start_time": response.get('appointment_start_time'),
-                            "finish_time": response.get('appointment_finish_time'),
-                            "patient_id": response.get('appointment_patient_id'),
-                            "practitioner_id": response.get('booked_practitioner_id'),
-                            "reason": response.get('appointment_reason')
-                        }
-                    }
-                    print("Formatted Data:", pateint_data)
+        event = json.loads(body)
+        if event.get("type") != "post_call_transcription":
+            return {"received": True}
 
+        data = event.get("data", {})
+        if data.get("agent_id") != ELEVENLABS_AGENT_ID:
+            return {"received": True}
 
-                    created_patient = await create_patient_and_store(patient_data=pateint_data,db=db)
-                    if created_patient and "id" in created_patient:
-                        # Replace patient_id in appointment if needed
-                        appintment_data["appointment"]["patient_id"] = created_patient["id"]
-                        created=await create_appointment_and_store(appointment_data=appintment_data,db=db)
-                        if created:
-                            print("Appointment created successfully.")
-                        else:
-                            print("Failed to create appointment.")
-            
+        transcript_data = data.get("transcript", "")
+        response = await OpenAiModel(transcript_data)
+        print("Response from OpenAI:", response)
 
-        return {"received": True}
+        if not response:
+            return {"received": True}
+
+        patient_data = {
+            "patient": {
+                "title": response.get("patient_title", "Mr"),
+                "first_name": response.get("patient_first_name"),
+                "last_name": response.get("patient_last_name", ""),
+                "date_of_birth": response.get("patient_dob"),
+                "gender": response.get("patient_gender", True),
+                "ethnicity": response.get("patient_ethnicity"),
+                "address_line_1": response.get("patient_address_line_1", ""),
+                "postcode": response.get("patient_postcode", ""),
+                "payment_plan_id": int(response.get("patient_payment_plan_id", 0)),
+                "payment_plan": [int(response.get("patient_payment_plan_id", 0))],
+                "email_address": response.get("patient_email"),
+                "mobile_phone": response.get("patient_phone_number"),
+            }
+        }
+
+        appointment_data = {
+            "appointment": {
+                "start_time": response.get("appointment_start_time"),
+                "finish_time": response.get("appointment_finish_time"),
+                "patient_id": response.get("appointment_patient_id"),
+                "practitioner_id": response.get("booked_practitioner_id"),
+                "reason": response.get("appointment_reason")
+            }
+        }
+
+        print("Formatted Patient Data:", patient_data)
+
+        db = await get_db()
+        created_patient = await create_patient_and_store(patient_data=patient_data, db=db)
+
+        if created_patient and "id" in created_patient:
+            appointment_data["appointment"]["patient_id"] = created_patient["id"]
+
+            created_appointment = await create_appointment_and_store(appointment_data=appointment_data, db=db)
+            if created_appointment:
+                try:
+                    usdt_amount = await get_usdt_amount(response.get("patient_status"), response.get("consultation_type"))
+                except Exception as e:
+                    print("Error fetching USDT amount:", str(e))
+                    usdt_amount = 50
+
+                if usdt_amount:
+                    patient_phone = response.get("patient_phone_number")
+                    patient_name = response.get("patient_first_name", "Client")
+
+                    payment_url = create_stripe_payment_link(usdt_amount)
+                    if payment_url:
+                        sms_message = f"Hi {patient_name}, please use this link to pay for your appointment: {payment_url}"
+                        print(sms_message)
+                        send_sms(to=patient_phone, message=sms_message)
+                        print("Appointment and payment SMS sent successfully.")
+            else:
+                print("Failed to create appointment.")
     except Exception as e:
-        print("Error processing event:", e)
-        return {"received": True}
+        print("Error processing event:", str(e))
 
+    return {"received": True}
 
 

@@ -17,13 +17,13 @@ You will be given a transcript DATA. Extract the following details and return on
 - patient_first_name
 - patient_last_name
 - patient_title (genrate based on patient_first_name and last_name  example  Mr/Mrs/Ms/, if not then use "Mr" as default )
-- pateint_dob
-- pateint_gender (The patient’s gender, is male or female generate this based on the pateint_first_name and pateint_last_name, if not then use Male as default )
+- patient_dob
+- patient_gender (The patient’s gender, is male or female generate this based on the pateint_first_name and pateint_last_name, if not then use Male as default )
 - patient_email
 - patient_phone_number
 - patient_ethnicity (if not then use '08' as default )
 - patient_address_line_1 (if not then user " " as default )
-- pateint_postcode (if not then user " " as default )
+- patient_postcode (if not then user " " as default )
 - patient_payment_plan_id (if not then use 45783 as default )
 - service_requested  
 - appointment_date (convert any relative references like "tomorrow" into the actual calendar date in UK timezone (Europe/London))  
@@ -34,6 +34,8 @@ You will be given a transcript DATA. Extract the following details and return on
 - appointment_start_time (convert to ISO 8601 format)
 - appointment_finish_time (convert to ISO 8601 format)
 - appointment_patient_id (if patient is created in the system, else return null) 
+- consultation_type (Based on the treatment type string, extract the consultation type e.g., “Biological Consultation”,"General Consultation","Hygiene Appointment" )
+-patient_status (e.g., “New” or “Existing”)
 
 Ensure the output is a single-line, compressed JSON with no newlines or spaces between fields.
 If any of the fields are not present in the transcript, return null for that field.
