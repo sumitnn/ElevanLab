@@ -6,7 +6,7 @@ from bson import ObjectId
 appointment_router = APIRouter()
 
 
-@appointment_router.get("/appointments", response_model=AppointmentList, response_model_by_alias=False)
+@appointment_router.get("/appointmentss", response_model=AppointmentList, response_model_by_alias=False)
 async def list_appointments(db=Depends(get_db)):
     cursor = db["appointments"].find()
     appointments_raw = await cursor.to_list(length=100)
