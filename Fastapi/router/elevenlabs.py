@@ -180,7 +180,7 @@ async def webhook_listener(request: Request, elevenlabs_signature: str = Header(
 
                     payment_url = create_stripe_payment_link(usdt_amount)
                     if payment_url:
-                        sms_message = f"Hi {patient_name}, please use this link to pay for your appointment: {payment_url}"
+                        sms_message = f"Hi {patient_name}, thank you for booking appointment with Wonder of Wellness, kindly pay on the link below to confirm your appointment {payment_url}"
                         print(sms_message)
                         send_sms(to=patient_phone, message=sms_message)
                         print("Appointment and payment SMS sent successfully.")

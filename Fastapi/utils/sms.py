@@ -20,7 +20,8 @@ def send_sms(to: str, message:str):
             {
                 "from": os.getenv("CLICKSEND_FROM"),
                 "body":message,
-                "to": to
+                "to": to,
+                "shorten_urls": True
             }
         ]
     }
